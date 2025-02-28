@@ -8,16 +8,20 @@ load_dotenv()
 
 
 class BrowserManager:
-    def __init__(self):
+    def __init__(self, browser_path=None, headless=True, user_agent=None, proxy=None):
         self.browser = None
+        self.browser_path = browser_path
+        self.headless = headless
+        self.user_agent = user_agent
+        self.proxy = proxy
 
-    def init_browser(self, user_agent=None):
+    def init_browser(self):
         """初始化浏览器"""
-        co = self._get_browser_options(user_agent)
+        co = self._get_browser_options()
         self.browser = Chromium(co)
         return self.browser
 
-    def _get_browser_options(self, user_agent=None):
+    def _get_browser_options(self):
         """获取浏览器配置"""
         co = ChromiumOptions()
         try:
@@ -26,23 +30,20 @@ class BrowserManager:
         except FileNotFoundError as e:
             logging.warning(f"警告: {e}")
 
-        browser_path = os.getenv("BROWSER_PATH")
-        if browser_path:
-            co.set_paths(browser_path=browser_path)
+        if self.browser_path:
+            co.set_paths(browser_path=self.browser_path)
 
         co.set_pref("credentials_enable_service", False)
         co.set_argument("--hide-crash-restore-bubble")
-        proxy = os.getenv("BROWSER_PROXY")
-        if proxy:
-            co.set_proxy(proxy)
+
+        if self.proxy:
+            co.set_proxy(self.proxy)
 
         co.auto_port()
-        if user_agent:
-            co.set_user_agent(user_agent)
+        if self.user_agent:
+            co.set_user_agent(self.user_agent)
 
-        co.headless(
-            os.getenv("BROWSER_HEADLESS", "True").lower() == "true"
-        )  # 生产环境使用无头模式
+        co.headless(self.headless)  # 使用配置的无头模式设置
 
         # Mac 系统特殊处理
         if sys.platform == "darwin":

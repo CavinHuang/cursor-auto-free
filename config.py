@@ -5,13 +5,43 @@ from logger import logging
 
 
 class Config:
-    def __init__(self):
+    def __init__(self, settings_dict=None):
+        self.imap = False
+        self.imap_protocol = 'POP3'  # 设置默认值
+
+        if settings_dict:
+            # 从设置字典加载配置
+            self._load_from_settings(settings_dict)
+        else:
+            # 从 .env 文件加载配置
+            self._load_from_env()
+
+        self.check_config()
+
+    def _load_from_settings(self, settings):
+        """从设置字典加载配置"""
+        self.domain = settings.get('domain', '').strip()
+        self.temp_mail = settings.get('temp_mail', '').strip()
+
+        # 如果临时邮箱为 null，则加载 IMAP 设置
+        if self.temp_mail == 'null':
+            self.imap = True
+            self.imap_server = settings.get('imap_server', '').strip()
+            self.imap_port = settings.get('imap_port', '').strip()
+            self.imap_user = settings.get('imap_user', '').strip()
+            self.imap_pass = settings.get('imap_pass', '').strip()
+            self.imap_dir = settings.get('imap_dir', 'inbox').strip()
+            self.imap_protocol = settings.get('imap_protocol', 'POP3')
+        else:
+            self.temp_mail_epin = settings.get('temp_mail_epin', '').strip()
+            self.temp_mail_ext = settings.get('temp_mail_ext', '').strip()
+
+    def _load_from_env(self):
+        """从 .env 文件加载配置"""
         # 获取应用程序的根目录路径
         if getattr(sys, "frozen", False):
-            # 如果是打包后的可执行文件
             application_path = os.path.dirname(sys.executable)
         else:
-            # 如果是开发环境
             application_path = os.path.dirname(os.path.abspath(__file__))
 
         # 指定 .env 文件的路径
@@ -23,8 +53,9 @@ class Config:
         # 加载 .env 文件
         load_dotenv(dotenv_path)
 
-        self.imap = False
-        self.temp_mail = os.getenv("TEMP_MAIL", "").strip().split("@")[0]
+        self.temp_mail = os.getenv("TEMP_MAIL", "").strip()
+        if '@' in self.temp_mail:
+            self.temp_mail = self.temp_mail.split("@")[0]
         self.temp_mail_epin = os.getenv("TEMP_MAIL_EPIN", "").strip()
         self.temp_mail_ext = os.getenv("TEMP_MAIL_EXT", "").strip()
         self.domain = os.getenv("DOMAIN", "").strip()
@@ -37,8 +68,7 @@ class Config:
             self.imap_user = os.getenv("IMAP_USER", "").strip()
             self.imap_pass = os.getenv("IMAP_PASS", "").strip()
             self.imap_dir = os.getenv("IMAP_DIR", "inbox").strip()
-
-        self.check_config()
+            self.imap_protocol = os.getenv("IMAP_PROTOCOL", "POP3").strip()
 
     def get_temp_mail(self):
 
@@ -68,11 +98,11 @@ class Config:
 
     def get_protocol(self):
         """获取邮件协议类型
-        
+
         Returns:
             str: 'IMAP' 或 'POP3'
         """
-        return os.getenv('IMAP_PROTOCOL', 'POP3')
+        return self.imap_protocol
 
     def check_config(self):
         """检查配置项是否有效

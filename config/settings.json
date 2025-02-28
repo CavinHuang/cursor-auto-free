@@ -1,0 +1,16 @@
+{
+    "domain": "mrhuang.site\njingkaai.site\nterminalxp.site",
+    "temp_mail": "null",
+    "imap_server": "imap.gmail.com",
+    "imap_port": "993",
+    "imap_user": "hcmzq0802@gmail.com",
+    "imap_pass": "vkmqxnnsydfreyxh",
+    "imap_protocol": "IMAP",
+    "browser_user_agent": "",
+    "browser_headless": 0,
+    "browser_path": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "proxy": "",
+    "retry_count": 3,
+    "log_level": "DEBUG",
+    "appearance_mode": "Light"
+}

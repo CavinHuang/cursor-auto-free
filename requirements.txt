@@ -3,3 +3,7 @@ colorama==0.4.6
 python-dotenv
 pyinstaller
 requests
+customtkinter==5.2.2
+darkdetect==0.8.0
+pillow
+fake_useragent
