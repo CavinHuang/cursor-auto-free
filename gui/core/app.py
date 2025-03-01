@@ -8,6 +8,7 @@ import logging
 from ..views.settings_view import SettingsView
 from ..views.log_view import LogView
 from .automation_manager import AutomationManager
+from .account_manager import AccountManager
 
 # 设置主题
 ctk.set_appearance_mode("dark")
@@ -28,6 +29,9 @@ class CursorProApp(ctk.CTk):
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
+        # 初始化账号管理器
+        self.account_manager = AccountManager()
+
         # 创建选项卡视图
         self.create_tab_view()
 
@@ -39,6 +43,7 @@ class CursorProApp(ctk.CTk):
             on_status_change=self.update_status,
             on_progress=self.add_log
         )
+        self.automation_manager.parent_app = self  # 添加对GUI的引用
 
     def create_tab_view(self):
         # 创建选项卡视图
@@ -67,14 +72,32 @@ class CursorProApp(ctk.CTk):
         self.log_view.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
 
     def create_home_tab(self):
+        # 账号信息框架
+        self.account_frame = ctk.CTkFrame(self.tab_home)
+        self.account_frame.grid(row=0, column=0, padx=20, pady=10, sticky="ew")
+
+        # 账号信息标签
+        self.account_info = {
+            "email": ctk.CTkLabel(self.account_frame, text="当前账号: 未登录", font=ctk.CTkFont(size=14)),
+            "created": ctk.CTkLabel(self.account_frame, text="创建时间: -", font=ctk.CTkFont(size=14)),
+            "valid_until": ctk.CTkLabel(self.account_frame, text="有效期至: -", font=ctk.CTkFont(size=14)),
+            "remaining": ctk.CTkLabel(self.account_frame, text="剩余天数: -", font=ctk.CTkFont(size=14))
+        }
+
+        # 布局账号信息
+        row = 0
+        for label in self.account_info.values():
+            label.grid(row=row, column=0, padx=10, pady=2, sticky="w")
+            row += 1
+
         # 状态指示器
         self.status_indicator = ctk.CTkLabel(self.tab_home, text="状态: 未运行",
                                            font=ctk.CTkFont(size=14))
-        self.status_indicator.grid(row=0, column=0, padx=20, pady=10, sticky="w")
+        self.status_indicator.grid(row=1, column=0, padx=20, pady=10, sticky="w")
 
         # 控制按钮
         self.control_frame = ctk.CTkFrame(self.tab_home)
-        self.control_frame.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
+        self.control_frame.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
 
         self.start_button = ctk.CTkButton(self.control_frame, text="开始运行",
                                          command=self.start_automation)
@@ -91,12 +114,24 @@ class CursorProApp(ctk.CTk):
 
         # 日志区域
         self.log_frame = ctk.CTkFrame(self.tab_home)
-        self.log_frame.grid(row=2, column=0, padx=20, pady=10, sticky="nsew")
+        self.log_frame.grid(row=3, column=0, padx=20, pady=10, sticky="nsew")
         self.log_frame.grid_columnconfigure(0, weight=1)
         self.log_frame.grid_rowconfigure(0, weight=1)
 
         self.log_text = ctk.CTkTextbox(self.log_frame)
         self.log_text.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        # 更新账号显示
+        self.update_account_display()
+
+    def update_account_display(self):
+        """更新账号信息显示"""
+        account_info = self.account_manager.get_account_info()
+
+        self.account_info["email"].configure(text=f"当前账号: {account_info['email']}")
+        self.account_info["created"].configure(text=f"创建时间: {account_info['created_at']}")
+        self.account_info["valid_until"].configure(text=f"有效期至: {account_info['valid_until']}")
+        self.account_info["remaining"].configure(text=f"剩余天数: {account_info['remaining_days']} 天")
 
     def create_status_bar(self):
         # 状态栏

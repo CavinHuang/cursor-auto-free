@@ -18,6 +18,7 @@ from exit_cursor import ExitCursor
 import patch_cursor_get_machine_id
 import go_cursor_help
 from config import Config
+from .account_manager import AccountManager
 
 # 定义 EMOJI 字典
 EMOJI = {"ERROR": "❌", "WARNING": "⚠️", "INFO": "ℹ️"}
@@ -84,6 +85,7 @@ class AutomationManager:
         self.is_running = False
         self.browser_manager = None
         self.current_task = None
+        self.account_manager = AccountManager()
         # 初始化时获取并显示Cursor版本
         self.cursor_version = self.get_cursor_version()
         self.update_status(f"当前 Cursor 版本: {self.cursor_version}")
@@ -429,6 +431,12 @@ class AutomationManager:
                 usage_info = usage_ele.text
                 total_usage = usage_info.split("/")[-1].strip()
                 logging.info(f"账户可用额度上限: {total_usage}")
+
+                # 保存账号信息
+                self.account_manager.save_account(account_info["email"], account_info["password"])
+                # 更新GUI显示
+                if hasattr(self, 'parent_app'):
+                    self.parent_app.update_account_display()
         except Exception as e:
             logging.error(f"获取账户额度信息失败: {str(e)}")
 

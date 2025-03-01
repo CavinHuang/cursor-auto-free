@@ -4,7 +4,7 @@ import json
 import os
 import logging
 import sys
-from datetime import datetime, timedelta
+from account_manager import AccountManager
 
 class SettingsView(ctk.CTkFrame):
     def __init__(self, parent, **kwargs):
@@ -39,68 +39,6 @@ class SettingsView(ctk.CTkFrame):
         )
         self.title_label.grid(row=0, column=0, padx=15, pady=(10, 5), sticky="w")
 
-        # 账号信息区域
-        self.account_frame = ctk.CTkFrame(self)
-        self.account_frame.grid(row=1, column=0, padx=15, pady=(0, 10), sticky="ew")
-        self.account_frame.grid_columnconfigure(1, weight=1)
-
-        # 账号信息标题
-        account_title = ctk.CTkLabel(
-            self.account_frame,
-            text="账号信息",
-            font=self.section_font,
-            text_color=("gray10", "gray90")
-        )
-        account_title.grid(row=0, column=0, columnspan=2, padx=10, pady=5, sticky="w")
-
-        # 账号
-        account_label = ctk.CTkLabel(
-            self.account_frame,
-            text="账号：",
-            font=self.label_font,
-            text_color=("gray25", "gray75")
-        )
-        account_label.grid(row=1, column=0, padx=10, pady=2, sticky="w")
-
-        self.account_value = ctk.CTkLabel(
-            self.account_frame,
-            text="未登录",
-            font=self.label_font
-        )
-        self.account_value.grid(row=1, column=1, padx=10, pady=2, sticky="w")
-
-        # 密码
-        password_label = ctk.CTkLabel(
-            self.account_frame,
-            text="密码：",
-            font=self.label_font,
-            text_color=("gray25", "gray75")
-        )
-        password_label.grid(row=2, column=0, padx=10, pady=2, sticky="w")
-
-        self.password_value = ctk.CTkLabel(
-            self.account_frame,
-            text="******",
-            font=self.label_font
-        )
-        self.password_value.grid(row=2, column=1, padx=10, pady=2, sticky="w")
-
-        # 到期时间
-        expiry_label = ctk.CTkLabel(
-            self.account_frame,
-            text="到期时间：",
-            font=self.label_font,
-            text_color=("gray25", "gray75")
-        )
-        expiry_label.grid(row=3, column=0, padx=10, pady=2, sticky="w")
-
-        self.expiry_value = ctk.CTkLabel(
-            self.account_frame,
-            text="未知",
-            font=self.label_font
-        )
-        self.expiry_value.grid(row=3, column=1, padx=10, pady=(2, 10), sticky="w")
-
         # 创建滚动容器
         self.scrollable_frame = ctk.CTkScrollableFrame(
             self,
@@ -109,7 +47,7 @@ class SettingsView(ctk.CTkFrame):
             scrollbar_button_color=("gray75", "gray15"),  # 优化滚动条按钮颜色
             scrollbar_button_hover_color=("gray85", "gray25")  # 优化滚动条悬停颜色
         )
-        self.scrollable_frame.grid(row=2, column=0, sticky="nsew", padx=15, pady=(0, 10))
+        self.scrollable_frame.grid(row=1, column=0, sticky="nsew", padx=15, pady=(0, 10))
 
         # 配置滚动容器的网格
         self.scrollable_frame.grid_columnconfigure(0, weight=1)
@@ -606,26 +544,6 @@ class SettingsView(ctk.CTkFrame):
         )
         ok_button.pack(pady=10)
 
-    def update_account_info(self, account: str = None, password: str = None, register_time: str = None):
-        """更新账号信息显示"""
-        if account:
-            self.account_value.configure(text=account)
-        if password:
-            self.password_value.configure(text="*" * len(password))
-
-        if register_time:
-            try:
-                # 将注册时间字符串转换为datetime对象
-                reg_time = datetime.strptime(register_time, "%Y-%m-%d %H:%M:%S")
-                # 计算到期时间（注册时间+15天）
-                expiry_time = reg_time + timedelta(days=15)
-                # 格式化显示
-                expiry_str = expiry_time.strftime("%Y-%m-%d %H:%M:%S")
-                self.expiry_value.configure(text=expiry_str)
-            except Exception as e:
-                logging.error(f"计算到期时间出错: {str(e)}")
-                self.expiry_value.configure(text="计算错误")
-
     def load_settings(self):
         """从文件加载设置"""
         try:
@@ -733,3 +651,22 @@ class SettingsView(ctk.CTkFrame):
             logging.error(f"加载设置失败: {str(e)}")
             # 不显示错误消息框，只记录日志
             # self.show_error_message(f"加载设置失败: {str(e)}")
+
+# 在自动化流程中使用
+account_manager = AccountManager()
+
+# 假设这是你的自动化流程中生成账号的部分
+def generate_account():
+    # 这里是你的账号生成逻辑
+    account = "example@email.com"
+    password = "generated_password"
+
+    # 保存账号信息
+    account_manager.save_account(account, password)
+
+    # 检查账号是否有效
+    if account_manager.is_account_valid():
+        remaining_days = account_manager.get_remaining_days()
+        print(f"账号有效，剩余 {remaining_days} 天")
+    else:
+        print("账号已过期")
