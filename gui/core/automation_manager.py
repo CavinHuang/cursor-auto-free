@@ -9,6 +9,7 @@ from enum import Enum
 from datetime import datetime
 from fake_useragent import UserAgent
 import platform
+import sys
 
 from cursor_auth_manager import CursorAuthManager
 from browser_utils import BrowserManager
@@ -22,6 +23,31 @@ from .account_manager import AccountManager
 
 # 定义 EMOJI 字典
 EMOJI = {"ERROR": "❌", "WARNING": "⚠️", "INFO": "ℹ️"}
+
+def get_app_data_dir(subdir=None):
+    """获取应用数据目录，确保目录存在并可写入
+
+    Args:
+        subdir: 可选的子目录名
+
+    Returns:
+        str: 数据目录的完整路径
+    """
+    # 根据不同操作系统获取适当的应用数据目录
+    if platform.system() == "Darwin":  # macOS
+        app_data = os.path.expanduser("~/Library/Application Support/CursorPro")
+    elif platform.system() == "Windows":  # Windows
+        app_data = os.path.join(os.getenv("APPDATA"), "CursorPro")
+    else:  # Linux
+        app_data = os.path.expanduser("~/.config/cursorpro")
+
+    # 如果提供了子目录，将其添加到路径
+    if subdir:
+        app_data = os.path.join(app_data, subdir)
+
+    # 确保目录存在
+    os.makedirs(app_data, exist_ok=True)
+    return app_data
 
 class VerificationStatus(Enum):
     """验证状态枚举"""
@@ -56,8 +82,20 @@ class EmailGenerator:
         logging.info(f"已选择域名: {self.selected_domain}")
 
     def load_names(self):
-        with open('names-dataset.txt', 'r') as file:
-            return file.read().split()
+        try:
+            # 根据是否打包确定基础路径
+            if getattr(sys, 'frozen', False):
+                base_path = sys._MEIPASS
+            else:
+                base_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+            names_file = os.path.join(base_path, 'names-dataset.txt')
+            with open(names_file, 'r') as file:
+                return file.read().split()
+        except Exception as e:
+            logging.warning(f"加载姓名数据集失败: {str(e)}，使用默认姓名列表")
+            # 使用一些默认姓名作为备选
+            return ["John", "Jane", "David", "Mary", "Robert", "Linda", "William", "Elizabeth"]
 
     def generate_random_name(self):
         """生成随机用户名"""
@@ -105,9 +143,8 @@ class AutomationManager:
     def save_screenshot(self, tab, stage: str, timestamp: bool = True) -> None:
         """保存页面截图"""
         try:
-            screenshot_dir = "screenshots"
-            if not os.path.exists(screenshot_dir):
-                os.makedirs(screenshot_dir)
+            # 使用用户数据目录中的screenshots文件夹
+            screenshot_dir = get_app_data_dir("screenshots")
 
             if timestamp:
                 filename = f"turnstile_{stage}_{int(time.time())}.png"
@@ -119,6 +156,12 @@ class AutomationManager:
             logging.debug(f"截图已保存: {filepath}")
         except Exception as e:
             logging.warning(f"截图保存失败: {str(e)}")
+            # 如果是权限问题，提供更具体的错误信息
+            if "Permission denied" in str(e) or "Read-only file system" in str(e):
+                logging.warning(f"截图目录无写入权限，请确保用户对目录有写入权限: {screenshot_dir}")
+            # 如果是磁盘空间问题
+            elif "No space left on device" in str(e):
+                logging.warning("磁盘空间不足，无法保存截图")
 
     def check_verification_success(self, tab) -> Optional[VerificationStatus]:
         """检查验证是否成功"""
@@ -128,7 +171,7 @@ class AutomationManager:
                 return status
         return None
 
-    def handle_turnstile(self, tab, max_retries: int = 2, retry_interval: tuple = (1, 2)) -> bool:
+    def handle_turnstile(self, tab, max_retries: int = 3, retry_interval: tuple = (1, 2)) -> bool:
         """处理 Turnstile 验证"""
         logging.info("正在检测 Turnstile 验证...")
         self.save_screenshot(tab, "start")
@@ -151,24 +194,48 @@ class AutomationManager:
 
                     if challenge_check:
                         logging.info("检测到 Turnstile 验证框，开始处理...")
-                        time.sleep(random.uniform(1, 3))
+                        # 点击前随机延时
+                        wait_before = random.uniform(1, 3)
+                        logging.debug(f"点击前等待 {wait_before:.2f} 秒")
+                        time.sleep(wait_before)
+
+                        # 点击验证框
                         challenge_check.click()
-                        time.sleep(1)
+                        logging.info("已点击验证框，等待验证结果...")
+
+                        # 点击后延长等待时间，给验证过程更多时间
+                        wait_after = random.uniform(2, 3)
+                        logging.debug(f"点击后等待 {wait_after:.2f} 秒")
+                        time.sleep(wait_after)
 
                         self.save_screenshot(tab, "clicked")
 
-                        if self.check_verification_success(tab):
+                        # 检查验证结果
+                        verification_result = self.check_verification_success(tab)
+                        if verification_result:
                             logging.info("Turnstile 验证通过")
                             self.save_screenshot(tab, "success")
                             return True
+                        else:
+                            logging.debug("点击后未检测到验证成功状态，继续等待...")
+                            # 再次等待一段时间检查结果
+                            time.sleep(2)
+                            if self.check_verification_success(tab):
+                                logging.info("Turnstile 验证成功（延迟检测）")
+                                self.save_screenshot(tab, "success_delayed")
+                                return True
 
                 except Exception as e:
                     logging.debug(f"当前尝试未成功: {str(e)}")
 
+                # 再次检查验证结果
                 if self.check_verification_success(tab):
                     return True
 
-                time.sleep(random.uniform(*retry_interval))
+                # 随机延时后继续下一次尝试
+                retry_wait = random.uniform(*retry_interval)
+                logging.debug(f"重试前等待 {retry_wait:.2f} 秒")
+                time.sleep(retry_wait)
 
             logging.error(f"验证失败 - 已达到最大重试次数 {max_retries}")
             self.save_screenshot(tab, "failed")
@@ -215,9 +282,19 @@ class AutomationManager:
 
     def get_user_agent(self):
         """获取随机user_agent"""
+        # 定义备用UA列表
+        fallback_uas = [
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0"
+        ]
+
         try:
             # 首先尝试使用fake-useragent生成随机UA
-            ua = UserAgent()
+            ua = UserAgent(fallback=fallback_uas[0])  # 设置一个默认的回退UA
             # 获取最新的Chrome浏览器UA
             user_agent = ua.chrome
             logging.info(f"成功生成随机user-agent: {user_agent}")
@@ -225,16 +302,24 @@ class AutomationManager:
         except Exception as e:
             logging.error(f"生成随机user agent失败: {str(e)}")
             try:
-                # 如果随机生成失败，尝试获取真实浏览器的UA
-                browser_manager = BrowserManager()
-                browser = browser_manager.init_browser()
-                user_agent = browser.latest_tab.run_js("return navigator.userAgent")
-                browser_manager.quit()
-                return user_agent
-            except Exception as e:
-                logging.error(f"获取真实浏览器user agent也失败: {str(e)}")
-                # 使用默认UA
-                return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                # 使用内置的备用UA列表
+                selected_ua = random.choice(fallback_uas)
+                logging.info(f"使用备用user-agent: {selected_ua}")
+                return selected_ua
+            except Exception:
+                # 如果备用UA也失败，尝试获取真实浏览器的UA
+                try:
+                    browser_manager = BrowserManager()
+                    browser = browser_manager.init_browser()
+                    user_agent = browser.latest_tab.run_js("return navigator.userAgent")
+                    browser_manager.quit()
+                    return user_agent
+                except Exception as e:
+                    logging.error(f"获取真实浏览器user agent也失败: {str(e)}")
+                    # 使用默认UA
+                    default_ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+                    logging.info(f"使用默认user-agent: {default_ua}")
+                    return default_ua
 
     def get_cursor_version(self) -> str:
         """获取Cursor版本"""

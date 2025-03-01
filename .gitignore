@@ -4,6 +4,7 @@ dist/
 *.spec
 !CursorKeepAlive.mac.spec
 !CursorKeepAlive.win.spec
+!CursorGUI.spec
 
 # Python
 __pycache__/

@@ -45,6 +45,15 @@ if [ ! -f "run_gui.py" ]; then
     exit 1
 fi
 
+# 检查.env文件是否存在，如果不存在则创建一个空的.env文件
+if [ ! -f ".env" ]; then
+    echo "未找到.env文件，创建一个默认的.env文件..."
+    touch .env
+    echo "# 环境变量配置文件" > .env
+    echo "# 在此处添加您的环境变量" >> .env
+    echo "APP_ENV=production" >> .env
+fi
+
 # 检查并创建必要的目录
 for dir in "assets" "config" "gui"; do
     if [ ! -d "$dir" ]; then

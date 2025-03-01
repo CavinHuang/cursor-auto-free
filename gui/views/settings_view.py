@@ -495,8 +495,7 @@ class SettingsView(ctk.CTkFrame):
             with open(settings_file, "w", encoding="utf-8") as f:
                 json.dump(settings, f, indent=4, ensure_ascii=False)
 
-            # 生成 .env 文件
-            env_file = os.path.join(self.config_dir, ".env")
+            # 生成 .env 文件内容
             env_content = [
                 f"DOMAIN='{settings['domain']}'",
                 f"TEMP_MAIL={settings['temp_mail']}",
@@ -516,19 +515,31 @@ class SettingsView(ctk.CTkFrame):
                 f"BROWSER_PATH='{settings['browser_path']}'"
             ]
 
+            env_content_str = "\n".join(env_content)
+
+            # 保存到用户配置目录的 .env 文件
+            env_file = os.path.join(self.config_dir, ".env")
             with open(env_file, "w", encoding="utf-8") as f:
-                f.write("\n".join(env_content))
+                f.write(env_content_str)
 
-            # 更新日志级别
-            if "log_level" in settings:
-                logging.getLogger().setLevel(settings["log_level"])
-            logging.info("设置已保存")
+            # 同时保存到应用程序目录中的 .env 文件（如果是打包应用）
+            try:
+                if getattr(sys, "frozen", False):
+                    app_env_file = os.path.join(os.path.dirname(sys.executable), ".env")
+                    with open(app_env_file, "w", encoding="utf-8") as f:
+                        f.write(env_content_str)
+                    logging.info(f"配置也已保存到应用程序目录: {app_env_file}")
+            except Exception as e:
+                logging.warning(f"无法将配置保存到应用程序目录: {str(e)}")
 
-            # 显示保存成功提示
             self.show_success_message()
+            return True
+
         except Exception as e:
-            logging.error(f"保存设置失败: {str(e)}")
-            self.show_error_message(str(e))
+            error_msg = f"保存设置失败: {str(e)}"
+            logging.error(error_msg)
+            self.show_error_message(error_msg)
+            return False
 
     def show_success_message(self):
         """显示保存成功提示"""

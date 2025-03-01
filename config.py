@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 import os
 import sys
 from logger import logging
+import platform
 
 
 class Config:
@@ -9,12 +10,22 @@ class Config:
         self.imap = False
         self.imap_protocol = 'POP3'  # 设置默认值
 
+        # 设置默认值
+        self.temp_mail = ""
+        self.temp_mail_epin = ""
+        self.temp_mail_ext = ""
+        self.domain = ""
+
         if settings_dict:
             # 从设置字典加载配置
             self._load_from_settings(settings_dict)
         else:
             # 从 .env 文件加载配置
-            self._load_from_env()
+            try:
+                self._load_from_env()
+            except FileNotFoundError as e:
+                logging.warning(f"{str(e)}，将使用默认配置")
+                # 使用默认配置继续运行
 
         self.check_config()
 
@@ -38,21 +49,46 @@ class Config:
 
     def _load_from_env(self):
         """从 .env 文件加载配置"""
-        # 获取应用程序的根目录路径
-        if getattr(sys, "frozen", False):
-            application_path = os.path.dirname(sys.executable)
-        else:
-            application_path = os.path.dirname(os.path.abspath(__file__))
+        # 首先尝试从用户配置目录加载
+        try:
+            # 获取用户配置目录
+            if platform.system() == "Darwin":  # macOS
+                app_data = os.path.expanduser("~/Library/Application Support/CursorPro")
+            elif platform.system() == "Windows":  # Windows
+                app_data = os.path.join(os.getenv("APPDATA"), "CursorPro")
+            else:  # Linux
+                app_data = os.path.expanduser("~/.config/cursorpro")
 
-        # 指定 .env 文件的路径
-        dotenv_path = os.path.join(application_path, ".env")
+            config_dir = os.path.join(app_data, "config")
+            dotenv_path = os.path.join(config_dir, ".env")
 
-        if not os.path.exists(dotenv_path):
-            raise FileNotFoundError(f"文件 {dotenv_path} 不存在")
+            if os.path.exists(dotenv_path):
+                # 加载 .env 文件
+                load_dotenv(dotenv_path)
+                logging.info(f"从用户配置目录加载配置: {dotenv_path}")
+            else:
+                # 如果用户配置目录不存在.env，尝试从应用程序目录加载
+                if getattr(sys, "frozen", False):
+                    application_path = os.path.dirname(sys.executable)
+                else:
+                    application_path = os.path.dirname(os.path.abspath(__file__))
 
-        # 加载 .env 文件
-        load_dotenv(dotenv_path)
+                # 指定 .env 文件的路径
+                dotenv_path = os.path.join(application_path, ".env")
 
+                if not os.path.exists(dotenv_path):
+                    raise FileNotFoundError(f"文件 {dotenv_path} 不存在")
+
+                # 加载 .env 文件
+                load_dotenv(dotenv_path)
+                logging.info(f"从应用程序目录加载配置: {dotenv_path}")
+        except FileNotFoundError as e:
+            raise e
+        except Exception as e:
+            logging.error(f"加载配置文件时出错: {str(e)}")
+            raise FileNotFoundError(f"加载配置文件失败: {str(e)}")
+
+        # 从环境变量读取配置
         self.temp_mail = os.getenv("TEMP_MAIL", "").strip()
         if '@' in self.temp_mail:
             self.temp_mail = self.temp_mail.split("@")[0]
@@ -117,16 +153,20 @@ class Config:
             "domain": "域名",
         }
 
-        # 检查基础配置
+        # 检查基础配置 - 改为警告而非抛出异常
         for key, name in required_configs.items():
             if not self.check_is_valid(getattr(self, key)):
-                raise ValueError(f"{name}未配置，请在 .env 文件中设置 {key.upper()}")
+                logging.warning(f"{name}未配置，使用默认值")
+                # 设置一个默认域名
+                if key == "domain" and not getattr(self, key):
+                    setattr(self, key, "example.com tempmail.org snapmail.cc")
 
         # 检查邮箱配置
         if self.temp_mail != "null":
             # tempmail.plus 模式
             if not self.check_is_valid(self.temp_mail):
-                raise ValueError("临时邮箱未配置，请在 .env 文件中设置 TEMP_MAIL")
+                logging.warning("临时邮箱未配置，使用默认值")
+                self.temp_mail = "cursor"  # 设置默认值
         else:
             # IMAP 模式
             imap_configs = {
@@ -136,18 +176,23 @@ class Config:
                 "imap_pass": "IMAP密码",
             }
 
+            has_invalid_config = False
             for key, name in imap_configs.items():
-                value = getattr(self, key)
+                value = getattr(self, key, "")
                 if value == "null" or not self.check_is_valid(value):
-                    raise ValueError(
-                        f"{name}未配置，请在 .env 文件中设置 {key.upper()}"
-                    )
+                    logging.warning(f"{name}未配置，IMAP模式将不可用")
+                    has_invalid_config = True
+
+            if has_invalid_config:
+                # 如果IMAP配置不完整，切换到默认邮箱模式
+                self.imap = False
+                self.temp_mail = "cursor"
+                logging.warning("由于IMAP配置不完整，已切换到默认邮箱模式")
 
             # IMAP_DIR 是可选的，如果设置了就检查其有效性
-            if self.imap_dir != "null" and not self.check_is_valid(self.imap_dir):
-                raise ValueError(
-                    "IMAP收件箱目录配置无效，请在 .env 文件中正确设置 IMAP_DIR"
-                )
+            elif hasattr(self, "imap_dir") and self.imap_dir != "null" and not self.check_is_valid(self.imap_dir):
+                logging.warning("IMAP收件箱目录配置无效，使用默认值inbox")
+                self.imap_dir = "inbox"
 
     def check_is_valid(self, value):
         """检查配置项是否有效
