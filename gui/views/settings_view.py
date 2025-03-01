@@ -4,6 +4,7 @@ import json
 import os
 import logging
 import sys
+from datetime import datetime, timedelta
 
 class SettingsView(ctk.CTkFrame):
     def __init__(self, parent, **kwargs):
@@ -14,9 +15,9 @@ class SettingsView(ctk.CTkFrame):
         self.grid_rowconfigure(1, weight=1)
 
         # 设置默认字体
-        self.title_font = ctk.CTkFont(size=24, weight="bold")
-        self.section_font = ctk.CTkFont(size=18, weight="bold")
-        self.label_font = ctk.CTkFont(size=14)
+        self.title_font = ctk.CTkFont(size=20, weight="bold")
+        self.section_font = ctk.CTkFont(size=16, weight="bold")
+        self.label_font = ctk.CTkFont(size=13)
 
         # 设置默认的浏览器路径
         self.default_browser_paths = {
@@ -36,15 +37,83 @@ class SettingsView(ctk.CTkFrame):
             font=self.title_font,
             text_color=("gray10", "gray90")
         )
-        self.title_label.grid(row=0, column=0, padx=30, pady=(30, 20), sticky="nw")
+        self.title_label.grid(row=0, column=0, padx=15, pady=(10, 5), sticky="w")
+
+        # 账号信息区域
+        self.account_frame = ctk.CTkFrame(self)
+        self.account_frame.grid(row=1, column=0, padx=15, pady=(0, 10), sticky="ew")
+        self.account_frame.grid_columnconfigure(1, weight=1)
+
+        # 账号信息标题
+        account_title = ctk.CTkLabel(
+            self.account_frame,
+            text="账号信息",
+            font=self.section_font,
+            text_color=("gray10", "gray90")
+        )
+        account_title.grid(row=0, column=0, columnspan=2, padx=10, pady=5, sticky="w")
+
+        # 账号
+        account_label = ctk.CTkLabel(
+            self.account_frame,
+            text="账号：",
+            font=self.label_font,
+            text_color=("gray25", "gray75")
+        )
+        account_label.grid(row=1, column=0, padx=10, pady=2, sticky="w")
+
+        self.account_value = ctk.CTkLabel(
+            self.account_frame,
+            text="未登录",
+            font=self.label_font
+        )
+        self.account_value.grid(row=1, column=1, padx=10, pady=2, sticky="w")
+
+        # 密码
+        password_label = ctk.CTkLabel(
+            self.account_frame,
+            text="密码：",
+            font=self.label_font,
+            text_color=("gray25", "gray75")
+        )
+        password_label.grid(row=2, column=0, padx=10, pady=2, sticky="w")
+
+        self.password_value = ctk.CTkLabel(
+            self.account_frame,
+            text="******",
+            font=self.label_font
+        )
+        self.password_value.grid(row=2, column=1, padx=10, pady=2, sticky="w")
+
+        # 到期时间
+        expiry_label = ctk.CTkLabel(
+            self.account_frame,
+            text="到期时间：",
+            font=self.label_font,
+            text_color=("gray25", "gray75")
+        )
+        expiry_label.grid(row=3, column=0, padx=10, pady=2, sticky="w")
+
+        self.expiry_value = ctk.CTkLabel(
+            self.account_frame,
+            text="未知",
+            font=self.label_font
+        )
+        self.expiry_value.grid(row=3, column=1, padx=10, pady=(2, 10), sticky="w")
 
         # 创建滚动容器
         self.scrollable_frame = ctk.CTkScrollableFrame(
             self,
-            fg_color="transparent"
+            fg_color="transparent",
+            height=500,  # 设置固定高度
+            scrollbar_button_color=("gray75", "gray15"),  # 优化滚动条按钮颜色
+            scrollbar_button_hover_color=("gray85", "gray25")  # 优化滚动条悬停颜色
         )
-        self.scrollable_frame.grid(row=1, column=0, sticky="nsew", padx=30, pady=(0, 30))
+        self.scrollable_frame.grid(row=2, column=0, sticky="nsew", padx=15, pady=(0, 10))
+
+        # 配置滚动容器的网格
         self.scrollable_frame.grid_columnconfigure(0, weight=1)
+        self.scrollable_frame._scrollbar.grid_configure(padx=(0, 5))  # 调整滚动条位置
 
         current_row = 0
 
@@ -160,8 +229,8 @@ class SettingsView(ctk.CTkFrame):
     def create_section_label(self, text: str, row: int):
         """创建分节标签"""
         # 创建分隔线
-        separator = ctk.CTkFrame(self.scrollable_frame, height=2)
-        separator.grid(row=row, column=0, sticky="ew", padx=20, pady=(30, 10))
+        separator = ctk.CTkFrame(self.scrollable_frame, height=1)
+        separator.grid(row=row, column=0, sticky="ew", padx=5, pady=(15, 5))
 
         # 创建标签
         label = ctk.CTkLabel(
@@ -170,52 +239,35 @@ class SettingsView(ctk.CTkFrame):
             font=self.section_font,
             text_color=("gray10", "gray90")
         )
-        label.grid(row=row+1, column=0, padx=20, pady=(10, 20), sticky="w")
+        label.grid(row=row+1, column=0, padx=5, pady=(5, 10), sticky="w")
         return row + 2
 
     def create_setting_item(self, label_text: str, placeholder: str,
-                          is_password: bool = False, width: int = 250) -> ctk.CTkFrame:
+                          is_password: bool = False, width: int = 400) -> ctk.CTkFrame:
         """创建设置项框架"""
         frame = ctk.CTkFrame(self.scrollable_frame, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0)  # 标签列不伸缩
-        frame.grid_columnconfigure(1, weight=0)  # 输入框列不伸缩
+        frame.grid_columnconfigure(0, weight=0)  # 不伸缩，保持靠左
+        frame.grid_columnconfigure(1, weight=1)  # 右侧填充
 
+        # 标签放在上面
         label = ctk.CTkLabel(
             frame,
             text=f"{label_text}:",
             font=self.label_font,
-            text_color=("gray25", "gray75")
+            text_color=("gray25", "gray75"),
         )
-        label.grid(row=0, column=0, padx=(20, 15), pady=12, sticky="w")
+        label.grid(row=0, column=0, padx=5, pady=(5, 0), sticky="w", columnspan=2)
 
-        # 生成一个统一的属性名
-        attr_map = {
-            "域名 (DOMAIN)": "domain",
-            "临时邮箱 (TEMP_MAIL)": "temp_mail",
-            "IMAP 服务器": "imap_server",
-            "IMAP 端口": "imap_port",
-            "IMAP 用户": "imap_user",
-            "IMAP 密码": "imap_pass",
-            "User Agent": "user_agent",
-            "浏览器路径": "browser_path",
-            "代理服务器": "proxy",
-            "重试次数": "retry"
-        }
-
-        attr_name = attr_map.get(label_text, label_text.lower().replace(" ", "_"))
-        attr_name = f"{attr_name}_entry"
-
-        # 对于域名使用文本框
+        # 输入框放在下面
         if label_text == "域名 (DOMAIN)":
             entry = ctk.CTkTextbox(
                 frame,
                 width=width,
-                height=80,  # 设置文本框高度
+                height=80,
                 font=self.label_font,
-                wrap="word"  # 启用自动换行
+                wrap="word"
             )
-            entry.insert("1.0", placeholder)  # 设置占位符
-            # 添加焦点事件来处理占位符
+            entry.insert("1.0", placeholder)
             entry.bind("<FocusIn>", lambda e: self._on_textbox_focus_in(entry, placeholder))
             entry.bind("<FocusOut>", lambda e: self._on_textbox_focus_out(entry, placeholder))
         else:
@@ -228,13 +280,9 @@ class SettingsView(ctk.CTkFrame):
                 font=self.label_font,
                 border_width=2
             )
-        entry.grid(row=0, column=1, padx=(0, 20), pady=12, sticky="w")
+        entry.grid(row=1, column=0, padx=5, pady=(5, 10), sticky="w")
 
-        # 保存组件引用
-        setattr(self, attr_name, entry)
-
-        # 调试日志
-        logging.debug(f"Created setting item with attribute name: {attr_name}")
+        setattr(self, f"{label_text.lower().replace(' ', '_')}_entry", entry)
         return frame
 
     def _on_textbox_focus_in(self, textbox: ctk.CTkTextbox, placeholder: str):
@@ -252,118 +300,108 @@ class SettingsView(ctk.CTkFrame):
                           command: Callable = None) -> ctk.CTkFrame:
         """创建选项框架"""
         frame = ctk.CTkFrame(self.scrollable_frame, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0)  # 标签列不伸缩
-        frame.grid_columnconfigure(1, weight=0)  # 选项列不伸缩
+        frame.grid_columnconfigure(0, weight=0)  # 不伸缩，保持靠左
+        frame.grid_columnconfigure(1, weight=1)  # 右侧填充
 
+        # 标签放在上面
         label = ctk.CTkLabel(
             frame,
             text=f"{label_text}:",
             font=self.label_font,
-            text_color=("gray25", "gray75")
+            text_color=("gray25", "gray75"),
         )
-        label.grid(row=0, column=0, padx=(20, 15), pady=12, sticky="w")
+        label.grid(row=0, column=0, padx=5, pady=(5, 0), sticky="w", columnspan=2)
 
-        # 选项属性名映射
-        option_map = {
-            "IMAP 协议": "imap_protocol",
-            "日志级别": "log_level",
-            "外观模式": "appearance_mode"
-        }
-
-        # 生成属性名
-        attr_name = option_map.get(label_text, label_text.lower().replace(" ", "_"))
-        attr_name = f"{attr_name}_option"
-
+        # 选项菜单放在下面
         option = ctk.CTkOptionMenu(
             frame,
             values=values,
             command=command,
-            width=250,
+            width=400,
             height=32,
             font=self.label_font,
             dropdown_font=self.label_font
         )
-        option.grid(row=0, column=1, padx=(0, 20), pady=12, sticky="w")
+        option.grid(row=1, column=0, padx=5, pady=(5, 10), sticky="w")
         option.set(values[0])
 
-        # 保存组件引用
-        setattr(self, attr_name, option)
-
-        # 调试日志
-        logging.debug(f"Created option item with attribute name: {attr_name}")
+        setattr(self, f"{label_text.lower().replace(' ', '_')}_option", option)
         return frame
 
     def create_switch_item(self, label_text: str, default_value: bool = False) -> ctk.CTkFrame:
         """创建开关框架"""
         frame = ctk.CTkFrame(self.scrollable_frame, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0)  # 开关列不伸缩
+        frame.grid_columnconfigure(0, weight=0)  # 不伸缩，保持靠左
+        frame.grid_columnconfigure(1, weight=1)  # 右侧填充
 
-        # 开关属性名映射
-        switch_map = {
-            "无头模式": "headless"
-        }
+        # 标签放在上面
+        label = ctk.CTkLabel(
+            frame,
+            text=f"{label_text}:",
+            font=self.label_font,
+            text_color=("gray25", "gray75"),
+        )
+        label.grid(row=0, column=0, padx=5, pady=(5, 0), sticky="w", columnspan=2)
 
-        # 生成属性名
-        attr_name = switch_map.get(label_text, label_text.lower().replace(" ", "_"))
-        attr_name = f"{attr_name}_switch"
-
+        # 开关放在下面
         switch = ctk.CTkSwitch(
             frame,
-            text=label_text,
-            font=self.label_font,
+            text="",  # 移除开关的文本
             height=32,
             switch_height=16,
             switch_width=40,
-            text_color=("gray25", "gray75")
         )
-        switch.grid(row=0, column=0, padx=20, pady=12, sticky="w")
+        switch.grid(row=1, column=0, padx=5, pady=(5, 10), sticky="w")
+
         if default_value:
             switch.select()
 
-        # 保存组件引用
-        setattr(self, attr_name, switch)
-
-        # 调试日志
-        logging.debug(f"Created switch item with attribute name: {attr_name}")
+        setattr(self, f"{label_text.lower().replace(' ', '_')}_switch", switch)
         return frame
 
     def create_browser_path_item(self, label_text: str, placeholder: str) -> ctk.CTkFrame:
         """创建浏览器路径选择框架"""
         frame = ctk.CTkFrame(self.scrollable_frame, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0)  # 标签列不伸缩
-        frame.grid_columnconfigure(1, weight=0)  # 输入框列不伸缩
-        frame.grid_columnconfigure(2, weight=0)  # 按钮列不伸缩
+        frame.grid_columnconfigure(0, weight=0)  # 不伸缩，保持靠左
+        frame.grid_columnconfigure(1, weight=1)  # 右侧填充
 
+        # 标签放在上面
         label = ctk.CTkLabel(
             frame,
             text=f"{label_text}:",
             font=self.label_font,
-            text_color=("gray25", "gray75")
+            text_color=("gray25", "gray75"),
         )
-        label.grid(row=0, column=0, padx=(20, 15), pady=12, sticky="w")
+        label.grid(row=0, column=0, padx=5, pady=(5, 0), sticky="w", columnspan=2)
 
+        # 创建一个子框架来容纳输入框和按钮
+        input_frame = ctk.CTkFrame(frame, fg_color="transparent")
+        input_frame.grid(row=1, column=0, padx=5, pady=(5, 10), sticky="w")
+        input_frame.grid_columnconfigure(0, weight=0)  # 输入框不伸缩
+        input_frame.grid_columnconfigure(1, weight=0)  # 按钮不伸缩
+
+        # 输入框和按钮放在下面
         entry = ctk.CTkEntry(
-            frame,
+            input_frame,
             placeholder_text=placeholder,
             width=400,
             height=32,
             font=self.label_font,
             border_width=2
         )
-        entry.grid(row=0, column=1, padx=(0, 10), pady=12, sticky="w")
+        entry.grid(row=0, column=0, padx=(0, 10), pady=0, sticky="w")
 
-        # 添加选择按钮
         select_button = ctk.CTkButton(
-            frame,
+            input_frame,
             text="选择",
             width=60,
             height=32,
             command=lambda: self._select_browser_path(entry)
         )
-        select_button.grid(row=0, column=2, padx=(0, 20), pady=12, sticky="w")
+        select_button.grid(row=0, column=1, padx=0, pady=0, sticky="w")
 
         # 设置默认值
-        default_path = self.default_browser_paths.get('darwin', '')
+        default_path = self.default_browser_paths.get(self.current_os, '')
         if os.path.exists(default_path):
             entry.insert(0, default_path)
 
@@ -433,26 +471,26 @@ class SettingsView(ctk.CTkFrame):
 
             settings = {
                 # 邮箱设置
-                "domain": self.domain_entry.get("1.0", "end-1c") if isinstance(self.domain_entry, ctk.CTkTextbox) else self.domain_entry.get(),
-                "temp_mail": self.temp_mail_entry.get() or "null",
+                "domain": self.domain_entry.get("1.0", "end-1c").strip() if isinstance(self.domain_entry, ctk.CTkTextbox) else self.domain_entry.get().strip(),
+                "temp_mail": self.temp_mail_entry.get().strip() or "null",
 
                 # IMAP 设置
-                "imap_server": self.imap_server_entry.get(),
-                "imap_port": self.imap_port_entry.get(),
-                "imap_user": self.imap_user_entry.get(),
-                "imap_pass": self.imap_pass_entry.get(),
+                "imap_server": self.imap_server_entry.get().strip(),
+                "imap_port": self.imap_port_entry.get().strip(),
+                "imap_user": self.imap_user_entry.get().strip(),
+                "imap_pass": self.imap_pass_entry.get().strip(),
                 "imap_protocol": self.imap_protocol_option.get(),
 
                 # 浏览器设置
-                "browser_user_agent": self.user_agent_entry.get(),
-                "browser_headless": self.headless_switch.get(),
-                "browser_path": self.browser_path_entry.get(),
+                "browser_user_agent": self.user_agent_entry.get().strip(),
+                "browser_headless": 1 if self.headless_switch.get() else 0,  # 转换为数字
+                "browser_path": self.browser_path_entry.get().strip(),
 
                 # 代理设置
-                "proxy": self.proxy_entry.get(),
+                "proxy": self.proxy_entry.get().strip(),
 
                 # 自动化设置
-                "retry_count": int(self.retry_entry.get() or 3),
+                "retry_count": int(self.retry_entry.get().strip() or 3),
 
                 # 其他设置
                 "log_level": self.log_level_option.get(),
@@ -568,57 +606,130 @@ class SettingsView(ctk.CTkFrame):
         )
         ok_button.pack(pady=10)
 
+    def update_account_info(self, account: str = None, password: str = None, register_time: str = None):
+        """更新账号信息显示"""
+        if account:
+            self.account_value.configure(text=account)
+        if password:
+            self.password_value.configure(text="*" * len(password))
+
+        if register_time:
+            try:
+                # 将注册时间字符串转换为datetime对象
+                reg_time = datetime.strptime(register_time, "%Y-%m-%d %H:%M:%S")
+                # 计算到期时间（注册时间+15天）
+                expiry_time = reg_time + timedelta(days=15)
+                # 格式化显示
+                expiry_str = expiry_time.strftime("%Y-%m-%d %H:%M:%S")
+                self.expiry_value.configure(text=expiry_str)
+            except Exception as e:
+                logging.error(f"计算到期时间出错: {str(e)}")
+                self.expiry_value.configure(text="计算错误")
+
     def load_settings(self):
         """从文件加载设置"""
         try:
+            # 首先尝试从 settings.json 加载
             if os.path.exists("config/settings.json"):
                 with open("config/settings.json", "r", encoding="utf-8") as f:
                     settings = json.load(f)
+                logging.info("从 settings.json 加载设置")
+            # 如果 settings.json 不存在，尝试从 .env 加载
+            elif os.path.exists(".env"):
+                settings = {}
+                with open(".env", "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#"):
+                            try:
+                                key, value = line.split("=", 1)
+                                key = key.strip()
+                                value = value.strip().strip("'\"")  # 移除引号
+                                settings[key.lower()] = value
+                            except ValueError:
+                                continue
+                logging.info("从 .env 加载设置")
+            else:
+                logging.info("没有找到设置文件，使用默认设置")
+                return
 
-                # 更新界面
-                self._update_entry_if_exists("domain", settings)
-                self._update_entry_if_exists("temp_mail", settings)
-                self._update_entry_if_exists("imap_server", settings)
-                self._update_entry_if_exists("imap_port", settings)
-                self._update_entry_if_exists("imap_user", settings)
-                self._update_entry_if_exists("imap_pass", settings)
+            # 更新界面，添加属性检查
+            # 邮箱设置
+            if hasattr(self, "domain_entry"):
+                if isinstance(self.domain_entry, ctk.CTkTextbox):
+                    self.domain_entry.delete("1.0", "end")
+                    self.domain_entry.insert("1.0", str(settings.get("domain", "")))
 
-                if "imap_protocol" in settings:
-                    self.imap_protocol_option.set(settings["imap_protocol"])
+            if hasattr(self, "temp_mail_entry"):
+                self.temp_mail_entry.delete(0, "end")
+                self.temp_mail_entry.insert(0, str(settings.get("temp_mail", "null")))
 
-                self._update_entry_if_exists("user_agent", settings, "browser_user_agent")
-                self._update_entry_if_exists("browser_path", settings)
+            # IMAP 设置
+            if hasattr(self, "imap_server_entry"):
+                self.imap_server_entry.delete(0, "end")
+                self.imap_server_entry.insert(0, str(settings.get("imap_server", "")))
 
-                if "browser_headless" in settings:
-                    if settings["browser_headless"]:
-                        self.headless_switch.select()
-                    else:
-                        self.headless_switch.deselect()
+            if hasattr(self, "imap_port_entry"):
+                self.imap_port_entry.delete(0, "end")
+                self.imap_port_entry.insert(0, str(settings.get("imap_port", "993")))
 
-                self._update_entry_if_exists("proxy", settings)
-                self._update_entry_if_exists("retry_count", settings)
+            if hasattr(self, "imap_user_entry"):
+                self.imap_user_entry.delete(0, "end")
+                self.imap_user_entry.insert(0, str(settings.get("imap_user", "")))
 
-                if "log_level" in settings:
-                    self.log_level_option.set(settings["log_level"])
-                    logging.getLogger().setLevel(settings["log_level"])
+            if hasattr(self, "imap_pass_entry"):
+                self.imap_pass_entry.delete(0, "end")
+                self.imap_pass_entry.insert(0, str(settings.get("imap_pass", "")))
 
-                if "appearance_mode" in settings:
-                    self.appearance_mode_option.set(settings["appearance_mode"])
-                    self.change_appearance_mode(settings["appearance_mode"])
+            # IMAP 协议
+            if hasattr(self, "imap_protocol_option"):
+                protocol = str(settings.get("imap_protocol", "IMAP"))
+                if protocol in ["IMAP", "POP3"]:
+                    self.imap_protocol_option.set(protocol)
+
+            # 浏览器设置
+            if hasattr(self, "user_agent_entry"):
+                self.user_agent_entry.delete(0, "end")
+                self.user_agent_entry.insert(0, str(settings.get("browser_user_agent", "")))
+
+            if hasattr(self, "browser_path_entry"):
+                self.browser_path_entry.delete(0, "end")
+                self.browser_path_entry.insert(0, str(settings.get("browser_path", "")))
+
+            # 无头模式
+            if hasattr(self, "headless_switch"):
+                if settings.get("browser_headless", 1):  # 1 表示开启
+                    self.headless_switch.select()
+                else:
+                    self.headless_switch.deselect()
+
+            # 代理设置
+            if hasattr(self, "proxy_entry"):
+                self.proxy_entry.delete(0, "end")
+                self.proxy_entry.insert(0, str(settings.get("proxy", "")))
+
+            # 重试次数
+            if hasattr(self, "retry_entry"):
+                self.retry_entry.delete(0, "end")
+                self.retry_entry.insert(0, str(settings.get("retry_count", 3)))
+
+            # 日志级别
+            if hasattr(self, "log_level_option"):
+                log_level = str(settings.get("log_level", "INFO"))
+                if log_level in ["DEBUG", "INFO", "WARNING", "ERROR"]:
+                    self.log_level_option.set(log_level)
+                    logging.getLogger().setLevel(log_level)
+
+            # 外观模式
+            if hasattr(self, "appearance_mode_option"):
+                appearance = str(settings.get("appearance_mode", "System"))
+                if appearance in ["Light", "Dark", "System"]:
+                    self.appearance_mode_option.set(appearance)
+                    self.change_appearance_mode(appearance)
+
+            logging.info("设置加载完成")
 
         except Exception as e:
             logging.error(f"加载设置失败: {str(e)}")
-
-    def _update_entry_if_exists(self, entry_name: str, settings: dict, settings_key: str = None):
-        """更新输入框的值"""
-        if not settings_key:
-            settings_key = entry_name
-
-        entry = getattr(self, f"{entry_name}_entry", None)
-        if entry and settings_key in settings:
-            if isinstance(entry, ctk.CTkTextbox):
-                entry.delete("1.0", "end")
-                entry.insert("1.0", str(settings[settings_key]))
-            else:
-                entry.delete(0, "end")
-                entry.insert(0, str(settings[settings_key]))
+            # 不显示错误消息框，只记录日志
+            # self.show_error_message(f"加载设置失败: {str(e)}")

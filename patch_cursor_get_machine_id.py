@@ -48,9 +48,7 @@ def get_cursor_paths() -> Tuple[str, str]:
             "main": "out/main.js",
         },
         "Windows": {
-            "base": os.path.join(
-                os.getenv("USERAPPPATH") or (os.getenv("LOCALAPPDATA", ""), "Programs", "Cursor", "resources", "app")
-            ),
+            "base": os.getenv("USERAPPPATH") or os.path.join(os.getenv("LOCALAPPDATA", ""), "Programs", "Cursor", "resources", "app"),
             "package": "package.json",
             "main": "out/main.js",
         },

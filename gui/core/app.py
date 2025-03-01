@@ -24,67 +24,56 @@ class CursorProApp(ctk.CTk):
         # 配置日志
         logging.basicConfig(level=logging.INFO)
 
+        # 创建主框架
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
+        # 创建选项卡视图
+        self.create_tab_view()
+
+        # 创建状态栏
+        self.create_status_bar()
+
         # 初始化自动化管理器
         self.automation_manager = AutomationManager(
             on_status_change=self.update_status,
             on_progress=self.add_log
         )
 
-        # 创建主框架
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=1)
+    def create_tab_view(self):
+        # 创建选项卡视图
+        self.tabview = ctk.CTkTabview(self)
+        self.tabview.grid(row=0, column=0, padx=20, pady=(20, 0), sticky="nsew")
 
-        # 创建侧边栏
-        self.create_sidebar()
+        # 添加选项卡
+        self.tab_home = self.tabview.add("主页")
+        self.tab_settings = self.tabview.add("设置")
+        self.tab_logs = self.tabview.add("日志")
 
-        # 创建主内容区
-        self.create_main_content()
+        # 配置选项卡网格
+        for tab in [self.tab_home, self.tab_settings, self.tab_logs]:
+            tab.grid_columnconfigure(0, weight=1)
+            tab.grid_rowconfigure(2, weight=1)
 
-        # 创建状态栏
-        self.create_status_bar()
+        # 创建主页内容
+        self.create_home_tab()
 
-        # 初始化视图
-        self.current_view = None
-        self.show_home()
+        # 创建设置页面
+        self.settings_view = SettingsView(self.tab_settings)
+        self.settings_view.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
 
-    def create_sidebar(self):
-        # 侧边栏框架
-        self.sidebar_frame = ctk.CTkFrame(self, width=140, corner_radius=0)
-        self.sidebar_frame.grid(row=0, column=0, rowspan=4, sticky="nsew")
-        self.sidebar_frame.grid_rowconfigure(4, weight=1)
+        # 创建日志页面
+        self.log_view = LogView(self.tab_logs)
+        self.log_view.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
 
-        # Logo
-        self.logo_label = ctk.CTkLabel(self.sidebar_frame, text="Cursor Pro",
-                                      font=ctk.CTkFont(size=20, weight="bold"))
-        self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
-
-        # 导航按钮
-        self.home_button = ctk.CTkButton(self.sidebar_frame, text="主页",
-                                        command=self.show_home)
-        self.home_button.grid(row=1, column=0, padx=20, pady=10)
-
-        self.settings_button = ctk.CTkButton(self.sidebar_frame, text="设置",
-                                            command=self.show_settings)
-        self.settings_button.grid(row=2, column=0, padx=20, pady=10)
-
-        self.logs_button = ctk.CTkButton(self.sidebar_frame, text="日志",
-                                        command=self.show_logs)
-        self.logs_button.grid(row=3, column=0, padx=20, pady=10)
-
-    def create_main_content(self):
-        # 主内容框架
-        self.main_frame = ctk.CTkFrame(self)
-        self.main_frame.grid(row=0, column=1, padx=(20, 20), pady=(20, 0), sticky="nsew")
-        self.main_frame.grid_columnconfigure(0, weight=1)
-        self.main_frame.grid_rowconfigure(2, weight=1)
-
+    def create_home_tab(self):
         # 状态指示器
-        self.status_indicator = ctk.CTkLabel(self.main_frame, text="状态: 未运行",
+        self.status_indicator = ctk.CTkLabel(self.tab_home, text="状态: 未运行",
                                            font=ctk.CTkFont(size=14))
         self.status_indicator.grid(row=0, column=0, padx=20, pady=10, sticky="w")
 
         # 控制按钮
-        self.control_frame = ctk.CTkFrame(self.main_frame)
+        self.control_frame = ctk.CTkFrame(self.tab_home)
         self.control_frame.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
 
         self.start_button = ctk.CTkButton(self.control_frame, text="开始运行",
@@ -101,7 +90,7 @@ class CursorProApp(ctk.CTk):
         self.reset_button.grid(row=0, column=2, padx=10, pady=10)
 
         # 日志区域
-        self.log_frame = ctk.CTkFrame(self.main_frame)
+        self.log_frame = ctk.CTkFrame(self.tab_home)
         self.log_frame.grid(row=2, column=0, padx=20, pady=10, sticky="nsew")
         self.log_frame.grid_columnconfigure(0, weight=1)
         self.log_frame.grid_rowconfigure(0, weight=1)
@@ -112,35 +101,10 @@ class CursorProApp(ctk.CTk):
     def create_status_bar(self):
         # 状态栏
         self.status_bar = ctk.CTkFrame(self, height=30)
-        self.status_bar.grid(row=3, column=1, sticky="ew")
+        self.status_bar.grid(row=1, column=0, sticky="ew")
 
         self.status_label = ctk.CTkLabel(self.status_bar, text="就绪")
         self.status_label.grid(row=0, column=0, padx=10)
-
-    def show_home(self):
-        self.clear_main_content()
-        self.main_frame.grid()
-        self.current_view = None
-        logging.info("显示主页")
-
-    def show_settings(self):
-        self.clear_main_content()
-        self.settings_view = SettingsView(self)
-        self.settings_view.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
-        self.current_view = self.settings_view
-        logging.info("显示设置页面")
-
-    def show_logs(self):
-        self.clear_main_content()
-        self.log_view = LogView(self)
-        self.log_view.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
-        self.current_view = self.log_view
-        logging.info("显示日志页面")
-
-    def clear_main_content(self):
-        if self.current_view:
-            self.current_view.grid_forget()
-        self.main_frame.grid_forget()
 
     def update_status(self, status: str):
         """更新状态显示"""
@@ -154,11 +118,7 @@ class CursorProApp(ctk.CTk):
 
     def start_automation(self):
         """开始自动化任务"""
-        if hasattr(self, "settings_view"):
-            config = self.settings_view.get_settings()
-        else:
-            config = {}
-
+        config = self.settings_view.get_settings()
         self.automation_manager.start_automation(config)
         self.start_button.configure(state="disabled")
         self.stop_button.configure(state="normal")

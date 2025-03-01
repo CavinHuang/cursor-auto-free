@@ -8,6 +8,7 @@ import os
 from enum import Enum
 from datetime import datetime
 from fake_useragent import UserAgent
+import platform
 
 from cursor_auth_manager import CursorAuthManager
 from browser_utils import BrowserManager
@@ -83,6 +84,9 @@ class AutomationManager:
         self.is_running = False
         self.browser_manager = None
         self.current_task = None
+        # 初始化时获取并显示Cursor版本
+        self.cursor_version = self.get_cursor_version()
+        self.update_status(f"当前 Cursor 版本: {self.cursor_version}")
 
     def update_status(self, status: str):
         """更新状态"""
@@ -230,13 +234,49 @@ class AutomationManager:
                 # 使用默认UA
                 return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
+    def get_cursor_version(self) -> str:
+        """获取Cursor版本"""
+        try:
+            # 获取系统类型
+            system = platform.system()
+            logging.info(f"当前操作系统: {system}")
+
+            # 获取路径
+            paths = patch_cursor_get_machine_id.get_cursor_paths()
+            logging.info(f"获取到的路径: {paths}")
+
+            # 确保我们使用正确的路径 - paths[0]是package.json的路径
+            pkg_path = paths[0]
+            logging.info(f"package.json路径: {pkg_path}")
+
+            if not os.path.exists(pkg_path):
+                raise FileNotFoundError(f"找不到文件: {pkg_path}")
+
+            with open(pkg_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                version = data.get("version")
+                if not version:
+                    raise ValueError("package.json中未找到version字段")
+
+                # 获取安装路径 - 需要往上两级目录才是Cursor的安装根目录
+                cursor_path = os.path.dirname(os.path.dirname(pkg_path))
+                return f"{version} (安装路径: {cursor_path})"
+        except FileNotFoundError as e:
+            logging.error(f"文件不存在: {str(e)}")
+            return "未知版本 (找不到Cursor安装目录)"
+        except json.JSONDecodeError as e:
+            logging.error(f"JSON解析错误: {str(e)}")
+            return "未知版本 (package.json格式错误)"
+        except Exception as e:
+            logging.error(f"获取Cursor版本失败: {str(e)}")
+            return "未知版本"
+
     def check_cursor_version(self):
         """检查 Cursor 版本"""
         try:
-            paths = patch_cursor_get_machine_id.get_cursor_paths()
+            package_path, main_path = patch_cursor_get_machine_id.get_cursor_paths()
             # 确保我们使用正确的路径
-            pkg_path = paths[0] if isinstance(paths, tuple) else paths
-            with open(pkg_path, "r", encoding="utf-8") as f:
+            with open(package_path, "r", encoding="utf-8") as f:
                 version = json.load(f)["version"]
             return patch_cursor_get_machine_id.version_check(version, min_version="0.45.0")
         except Exception as e:
@@ -264,6 +304,28 @@ class AutomationManager:
                 MachineIDResetter().reset_machine_ids()
 
             self.update_status("机器码重置完成")
+
+            # 重启 Cursor
+            self.update_status("正在重启 Cursor...")
+            try:
+                if platform.system() == "Darwin":  # macOS
+                    os.system("open -a Cursor")
+                elif platform.system() == "Windows":  # Windows
+                    cursor_path = os.path.join(os.getenv("LOCALAPPDATA", ""), "Programs", "Cursor", "Cursor.exe")
+                    if os.path.exists(cursor_path):
+                        os.system(f'start "" "{cursor_path}"')
+                    else:
+                        logging.warning("找不到Cursor可执行文件，请手动启动")
+                elif platform.system() == "Linux":  # Linux
+                    os.system("cursor")
+                else:
+                    logging.warning("不支持的操作系统，请手动启动Cursor")
+
+                self.update_status("Cursor 已重启")
+            except Exception as e:
+                logging.error(f"重启Cursor失败: {str(e)}")
+                self.update_status("请手动重启Cursor")
+
             return True
         except Exception as e:
             error_msg = f"重置机器码失败: {str(e)}"
@@ -394,7 +456,7 @@ class AutomationManager:
     def _run_automation(self, config: dict):
         """运行自动化任务"""
         try:
-            self.update_status("正在初始化...")
+            self.update_status(f"正在初始化... (Cursor版本: {self.cursor_version})")
 
             # 获取user-agent
             self.update_progress("正在获取user-agent...")
