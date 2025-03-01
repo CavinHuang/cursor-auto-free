@@ -5,10 +5,25 @@ import os
 import logging
 import sys
 import re
+import platform
+
+def get_app_config_dir():
+    """获取应用配置目录"""
+    if platform.system() == "Darwin":  # macOS
+        app_data = os.path.expanduser("~/Library/Application Support/CursorPro")
+    elif platform.system() == "Windows":  # Windows
+        app_data = os.path.join(os.getenv("APPDATA"), "CursorPro")
+    else:  # Linux
+        app_data = os.path.expanduser("~/.config/cursorpro")
+
+    config_dir = os.path.join(app_data, "config")
+    os.makedirs(config_dir, exist_ok=True)
+    return config_dir
 
 class SettingsView(ctk.CTkFrame):
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
+        self.config_dir = get_app_config_dir()
 
         # 配置主框架
         self.grid_columnconfigure(0, weight=1)
@@ -528,14 +543,16 @@ class SettingsView(ctk.CTkFrame):
     def save_settings(self):
         """保存设置到文件"""
         settings = self.get_settings()
-        os.makedirs("config", exist_ok=True)
+        os.makedirs(self.config_dir, exist_ok=True)
 
         try:
             # 保存到 settings.json
-            with open("config/settings.json", "w", encoding="utf-8") as f:
+            settings_file = os.path.join(self.config_dir, "settings.json")
+            with open(settings_file, "w", encoding="utf-8") as f:
                 json.dump(settings, f, indent=4, ensure_ascii=False)
 
             # 生成 .env 文件
+            env_file = os.path.join(self.config_dir, ".env")
             env_content = [
                 f"DOMAIN='{settings['domain']}'",
                 f"TEMP_MAIL={settings['temp_mail']}",
@@ -555,7 +572,7 @@ class SettingsView(ctk.CTkFrame):
                 f"BROWSER_PATH='{settings['browser_path']}'"
             ]
 
-            with open(".env", "w", encoding="utf-8") as f:
+            with open(env_file, "w", encoding="utf-8") as f:
                 f.write("\n".join(env_content))
 
             # 更新日志级别
@@ -628,9 +645,9 @@ class SettingsView(ctk.CTkFrame):
     def load_settings(self):
         """从文件加载设置"""
         try:
-            # 首先尝试从 settings.json 加载
-            if os.path.exists("config/settings.json"):
-                with open("config/settings.json", "r", encoding="utf-8") as f:
+            settings_file = os.path.join(self.config_dir, "settings.json")
+            if os.path.exists(settings_file):
+                with open(settings_file, "r", encoding="utf-8") as f:
                     settings = json.load(f)
                 logging.info("从 settings.json 加载设置")
                 logging.debug(f"加载的设置内容: {settings}")

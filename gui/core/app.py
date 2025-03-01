@@ -1,6 +1,7 @@
 import customtkinter as ctk
 import sys
 import os
+import platform
 from PIL import Image
 import logging
 
@@ -10,6 +11,30 @@ from ..views.log_view import LogView
 from .automation_manager import AutomationManager
 from .account_manager import AccountManager
 
+def get_app_data_dir():
+    """获取应用数据目录"""
+    if platform.system() == "Darwin":  # macOS
+        app_data = os.path.expanduser("~/Library/Application Support/CursorPro")
+    elif platform.system() == "Windows":  # Windows
+        app_data = os.path.join(os.getenv("APPDATA"), "CursorPro")
+    else:  # Linux
+        app_data = os.path.expanduser("~/.config/cursorpro")
+    return app_data
+
+def ensure_app_directories():
+    """确保应用所需的所有目录都存在"""
+    app_data = get_app_data_dir()
+    dirs = {
+        "logs": os.path.join(app_data, "logs"),
+        "config": os.path.join(app_data, "config"),
+        "cache": os.path.join(app_data, "cache"),
+    }
+
+    for dir_path in dirs.values():
+        os.makedirs(dir_path, exist_ok=True)
+
+    return dirs
+
 # 设置主题
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -17,6 +42,9 @@ ctk.set_default_color_theme("blue")
 class CursorProApp(ctk.CTk):
     def __init__(self):
         super().__init__()
+
+        # 确保应用目录存在
+        self.app_dirs = ensure_app_directories()
 
         # 配置主窗口
         self.title("Cursor Pro 自动化工具")

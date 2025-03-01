@@ -1,11 +1,25 @@
 import json
 import os
 import logging
+import platform
 from datetime import datetime, timedelta
+
+def get_app_config_dir():
+    """获取应用配置目录"""
+    if platform.system() == "Darwin":  # macOS
+        app_data = os.path.expanduser("~/Library/Application Support/CursorPro")
+    elif platform.system() == "Windows":  # Windows
+        app_data = os.path.join(os.getenv("APPDATA"), "CursorPro")
+    else:  # Linux
+        app_data = os.path.expanduser("~/.config/cursorpro")
+
+    config_dir = os.path.join(app_data, "config")
+    os.makedirs(config_dir, exist_ok=True)
+    return config_dir
 
 class AccountManager:
     def __init__(self):
-        self.config_dir = "config"
+        self.config_dir = get_app_config_dir()
         self.accounts_file = os.path.join(self.config_dir, "accounts.json")
         self._ensure_config_dir()
         self.current_account = self.load_current_account()
