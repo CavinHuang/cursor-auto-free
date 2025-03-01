@@ -153,7 +153,7 @@ class AutomationManager:
                         logging.info("检测到 Turnstile 验证框，开始处理...")
                         time.sleep(random.uniform(1, 3))
                         challenge_check.click()
-                        time.sleep(2)
+                        time.sleep(1)
 
                         self.save_screenshot(tab, "clicked")
 
@@ -180,7 +180,7 @@ class AutomationManager:
             self.save_screenshot(tab, "error")
             raise TurnstileError(error_msg)
 
-    def get_cursor_session_token(self, tab, max_attempts=3, retry_interval=2):
+    def get_cursor_session_token(self, tab, max_attempts=3, retry_interval=1):
         """获取Cursor会话token"""
         logging.info("开始获取cookie")
         attempts = 0
