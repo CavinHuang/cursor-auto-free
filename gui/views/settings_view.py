@@ -4,7 +4,7 @@ import json
 import os
 import logging
 import sys
-from account_manager import AccountManager
+import re
 
 class SettingsView(ctk.CTkFrame):
     def __init__(self, parent, **kwargs):
@@ -196,7 +196,7 @@ class SettingsView(ctk.CTkFrame):
         )
         label.grid(row=0, column=0, padx=5, pady=(5, 0), sticky="w", columnspan=2)
 
-        # 输入框放在下面
+        # 输入框和按钮放在下面
         if label_text == "域名 (DOMAIN)":
             entry = ctk.CTkTextbox(
                 frame,
@@ -205,9 +205,10 @@ class SettingsView(ctk.CTkFrame):
                 font=self.label_font,
                 wrap="word"
             )
-            entry.insert("1.0", placeholder)
-            entry.bind("<FocusIn>", lambda e: self._on_textbox_focus_in(entry, placeholder))
-            entry.bind("<FocusOut>", lambda e: self._on_textbox_focus_out(entry, placeholder))
+            entry._placeholder = placeholder  # 保存占位符以供后续使用
+            entry._has_content = False  # 添加标记来追踪是否有实际内容
+            entry.bind("<FocusIn>", lambda e: self._on_textbox_focus_in(entry))
+            entry.bind("<FocusOut>", lambda e: self._on_textbox_focus_out(entry))
         else:
             entry = ctk.CTkEntry(
                 frame,
@@ -220,19 +221,63 @@ class SettingsView(ctk.CTkFrame):
             )
         entry.grid(row=1, column=0, padx=5, pady=(5, 10), sticky="w")
 
-        setattr(self, f"{label_text.lower().replace(' ', '_')}_entry", entry)
+        # 规范化属性名称
+        attr_name = label_text.lower()
+        # 处理特殊情况
+        if "user agent" in attr_name:
+            attr_name = "user_agent"
+        elif "浏览器路径" in attr_name:
+            attr_name = "browser_path"
+        elif "无头模式" in attr_name:
+            attr_name = "headless"
+        elif "域名 (domain)" in attr_name.lower():
+            attr_name = "domain"
+        elif "临时邮箱 (temp_mail)" in attr_name.lower():
+            attr_name = "temp_mail"
+        elif "imap 服务器" in attr_name.lower():
+            attr_name = "imap_server"
+        elif "imap 端口" in attr_name.lower():
+            attr_name = "imap_port"
+        elif "imap 用户" in attr_name.lower():
+            attr_name = "imap_user"
+        elif "imap 密码" in attr_name.lower():
+            attr_name = "imap_pass"
+        elif "代理服务器" in attr_name:
+            attr_name = "proxy"
+        elif "重试次数" in attr_name:
+            attr_name = "retry"
+        else:
+            # 移除括号内容
+            attr_name = re.sub(r'\([^)]*\)', '', attr_name)
+            # 替换空格为下划线
+            attr_name = attr_name.replace(" ", "_")
+            # 移除其他特殊字符
+            attr_name = re.sub(r'[^a-z0-9_]', '', attr_name)
+
+        # 添加后缀
+        if attr_name != "headless":
+            attr_name = f"{attr_name}_entry"
+        else:
+            attr_name = f"{attr_name}_switch"
+
+        logging.debug(f"Setting attribute: {attr_name}")  # 添加调试日志
+        setattr(self, attr_name, entry)
         return frame
 
-    def _on_textbox_focus_in(self, textbox: ctk.CTkTextbox, placeholder: str):
+    def _on_textbox_focus_in(self, textbox: ctk.CTkTextbox):
         """文本框获得焦点时的处理"""
-        if textbox.get("1.0", "end-1c") == placeholder:
+        if not textbox._has_content:
             textbox.delete("1.0", "end")
 
-    def _on_textbox_focus_out(self, textbox: ctk.CTkTextbox, placeholder: str):
+    def _on_textbox_focus_out(self, textbox: ctk.CTkTextbox):
         """文本框失去焦点时的处理"""
-        if not textbox.get("1.0", "end-1c").strip():
+        current_text = textbox.get("1.0", "end-1c").strip()
+        if not current_text:
+            textbox._has_content = False
             textbox.delete("1.0", "end")
-            textbox.insert("1.0", placeholder)
+            textbox.insert("1.0", textbox._placeholder)
+        else:
+            textbox._has_content = True
 
     def create_option_item(self, label_text: str, values: list,
                           command: Callable = None) -> ctk.CTkFrame:
@@ -263,7 +308,27 @@ class SettingsView(ctk.CTkFrame):
         option.grid(row=1, column=0, padx=5, pady=(5, 10), sticky="w")
         option.set(values[0])
 
-        setattr(self, f"{label_text.lower().replace(' ', '_')}_option", option)
+        # 规范化属性名称
+        attr_name = label_text.lower()
+        # 处理特殊情况
+        if "imap 协议" in attr_name.lower():
+            attr_name = "imap_protocol"
+        elif "日志级别" in attr_name:
+            attr_name = "log_level"
+        elif "外观模式" in attr_name:
+            attr_name = "appearance_mode"
+        else:
+            # 移除括号内容
+            attr_name = re.sub(r'\([^)]*\)', '', attr_name)
+            # 替换空格为下划线
+            attr_name = attr_name.replace(" ", "_")
+            # 移除其他特殊字符
+            attr_name = re.sub(r'[^a-z0-9_]', '', attr_name)
+
+        attr_name = f"{attr_name}_option"
+
+        logging.debug(f"Setting option attribute: {attr_name}")  # 添加调试日志
+        setattr(self, attr_name, option)
         return frame
 
     def create_switch_item(self, label_text: str, default_value: bool = False) -> ctk.CTkFrame:
@@ -294,7 +359,23 @@ class SettingsView(ctk.CTkFrame):
         if default_value:
             switch.select()
 
-        setattr(self, f"{label_text.lower().replace(' ', '_')}_switch", switch)
+        # 规范化属性名称
+        attr_name = label_text.lower()
+        # 处理特殊情况
+        if "无头模式" in attr_name:
+            attr_name = "headless"
+        else:
+            # 移除括号内容
+            attr_name = re.sub(r'\([^)]*\)', '', attr_name)
+            # 替换空格为下划线
+            attr_name = attr_name.replace(" ", "_")
+            # 移除其他特殊字符
+            attr_name = re.sub(r'[^a-z0-9_]', '', attr_name)
+
+        attr_name = f"{attr_name}_switch"
+
+        logging.debug(f"Setting switch attribute: {attr_name}")  # 添加调试日志
+        setattr(self, attr_name, switch)
         return frame
 
     def create_browser_path_item(self, label_text: str, placeholder: str) -> ctk.CTkFrame:
@@ -552,6 +633,160 @@ class SettingsView(ctk.CTkFrame):
                 with open("config/settings.json", "r", encoding="utf-8") as f:
                     settings = json.load(f)
                 logging.info("从 settings.json 加载设置")
+                logging.debug(f"加载的设置内容: {settings}")
+
+                # 更新界面，添加属性检查
+                # 邮箱设置
+                if hasattr(self, "domain_entry"):
+                    logging.debug("找到 domain_entry 属性")
+                    if isinstance(self.domain_entry, ctk.CTkTextbox):
+                        self.domain_entry.delete("1.0", "end")
+                        domain_value = settings.get("domain", "")
+                        logging.debug(f"设置 domain 值: {domain_value}")
+                        if domain_value:
+                            self.domain_entry.insert("1.0", domain_value)
+                            self.domain_entry._has_content = True
+                        else:
+                            self.domain_entry.insert("1.0", self.domain_entry._placeholder)
+                            self.domain_entry._has_content = False
+                else:
+                    logging.warning("未找到 domain_entry 属性")
+
+                if hasattr(self, "temp_mail_entry"):
+                    logging.debug("找到 temp_mail_entry 属性")
+                    self.temp_mail_entry.delete(0, "end")
+                    temp_mail_value = str(settings.get("temp_mail", "null"))
+                    logging.debug(f"设置 temp_mail 值: {temp_mail_value}")
+                    self.temp_mail_entry.insert(0, temp_mail_value)
+                else:
+                    logging.warning("未找到 temp_mail_entry 属性")
+
+                # IMAP 设置
+                if hasattr(self, "imap_server_entry"):
+                    logging.debug("找到 imap_server_entry 属性")
+                    self.imap_server_entry.delete(0, "end")
+                    imap_server_value = str(settings.get("imap_server", ""))
+                    logging.debug(f"设置 imap_server 值: {imap_server_value}")
+                    self.imap_server_entry.insert(0, imap_server_value)
+                else:
+                    logging.warning("未找到 imap_server_entry 属性")
+
+                if hasattr(self, "imap_port_entry"):
+                    logging.debug("找到 imap_port_entry 属性")
+                    self.imap_port_entry.delete(0, "end")
+                    imap_port_value = str(settings.get("imap_port", "993"))
+                    logging.debug(f"设置 imap_port 值: {imap_port_value}")
+                    self.imap_port_entry.insert(0, imap_port_value)
+                else:
+                    logging.warning("未找到 imap_port_entry 属性")
+
+                if hasattr(self, "imap_user_entry"):
+                    logging.debug("找到 imap_user_entry 属性")
+                    self.imap_user_entry.delete(0, "end")
+                    imap_user_value = str(settings.get("imap_user", ""))
+                    logging.debug(f"设置 imap_user 值: {imap_user_value}")
+                    self.imap_user_entry.insert(0, imap_user_value)
+                else:
+                    logging.warning("未找到 imap_user_entry 属性")
+
+                if hasattr(self, "imap_pass_entry"):
+                    logging.debug("找到 imap_pass_entry 属性")
+                    self.imap_pass_entry.delete(0, "end")
+                    imap_pass_value = str(settings.get("imap_pass", ""))
+                    logging.debug(f"设置 imap_pass 值: {imap_pass_value}")
+                    self.imap_pass_entry.insert(0, imap_pass_value)
+                else:
+                    logging.warning("未找到 imap_pass_entry 属性")
+
+                # IMAP 协议
+                if hasattr(self, "imap_protocol_option"):
+                    logging.debug("找到 imap_protocol_option 属性")
+                    protocol = str(settings.get("imap_protocol", "IMAP"))
+                    logging.debug(f"设置 imap_protocol 值: {protocol}")
+                    if protocol in ["IMAP", "POP3"]:
+                        self.imap_protocol_option.set(protocol)
+                else:
+                    logging.warning("未找到 imap_protocol_option 属性")
+
+                # 浏览器设置
+                if hasattr(self, "user_agent_entry"):
+                    logging.debug("找到 user_agent_entry 属性")
+                    self.user_agent_entry.delete(0, "end")
+                    user_agent_value = str(settings.get("browser_user_agent", ""))
+                    logging.debug(f"设置 browser_user_agent 值: {user_agent_value}")
+                    self.user_agent_entry.insert(0, user_agent_value)
+                else:
+                    logging.warning("未找到 user_agent_entry 属性")
+
+                if hasattr(self, "browser_path_entry"):
+                    logging.debug("找到 browser_path_entry 属性")
+                    self.browser_path_entry.delete(0, "end")
+                    browser_path_value = str(settings.get("browser_path", ""))
+                    logging.debug(f"设置 browser_path 值: {browser_path_value}")
+                    self.browser_path_entry.insert(0, browser_path_value)
+                else:
+                    logging.warning("未找到 browser_path_entry 属性")
+
+                # 无头模式
+                if hasattr(self, "headless_switch"):
+                    logging.debug("找到 headless_switch 属性")
+                    headless_value = settings.get("browser_headless", 1)
+                    logging.debug(f"设置 browser_headless 值: {headless_value}")
+                    if headless_value:  # 1 表示开启
+                        self.headless_switch.select()
+                    else:
+                        self.headless_switch.deselect()
+                else:
+                    logging.warning("未找到 headless_switch 属性")
+
+                # 代理设置
+                if hasattr(self, "proxy_entry"):
+                    logging.debug("找到 proxy_entry 属性")
+                    self.proxy_entry.delete(0, "end")
+                    proxy_value = str(settings.get("proxy", ""))
+                    logging.debug(f"设置 proxy 值: {proxy_value}")
+                    self.proxy_entry.insert(0, proxy_value)
+                else:
+                    logging.warning("未找到 proxy_entry 属性")
+
+                # 重试次数
+                if hasattr(self, "retry_entry"):
+                    logging.debug("找到 retry_entry 属性")
+                    self.retry_entry.delete(0, "end")
+                    retry_value = str(settings.get("retry_count", 3))
+                    logging.debug(f"设置 retry_count 值: {retry_value}")
+                    self.retry_entry.insert(0, retry_value)
+                else:
+                    logging.warning("未找到 retry_entry 属性")
+
+                # 日志级别
+                if hasattr(self, "log_level_option"):
+                    logging.debug("找到 log_level_option 属性")
+                    log_level = str(settings.get("log_level", "INFO"))
+                    logging.debug(f"设置 log_level 值: {log_level}")
+                    if log_level in ["DEBUG", "INFO", "WARNING", "ERROR"]:
+                        self.log_level_option.set(log_level)
+                        logging.getLogger().setLevel(log_level)
+                else:
+                    logging.warning("未找到 log_level_option 属性")
+
+                # 外观模式
+                if hasattr(self, "appearance_mode_option"):
+                    logging.debug("找到 appearance_mode_option 属性")
+                    appearance = str(settings.get("appearance_mode", "System"))
+                    logging.debug(f"设置 appearance_mode 值: {appearance}")
+                    if appearance in ["Light", "Dark", "System"]:
+                        self.appearance_mode_option.set(appearance)
+                        self.change_appearance_mode(appearance)
+                else:
+                    logging.warning("未找到 appearance_mode_option 属性")
+
+                # 检查所有设置项的属性
+                all_attrs = [attr for attr in dir(self) if attr.endswith('_entry') or attr.endswith('_option') or attr.endswith('_switch')]
+                logging.debug(f"所有可用的设置项属性: {all_attrs}")
+
+                logging.info("设置加载完成")
+
             # 如果 settings.json 不存在，尝试从 .env 加载
             elif os.path.exists(".env"):
                 settings = {}
@@ -571,102 +806,8 @@ class SettingsView(ctk.CTkFrame):
                 logging.info("没有找到设置文件，使用默认设置")
                 return
 
-            # 更新界面，添加属性检查
-            # 邮箱设置
-            if hasattr(self, "domain_entry"):
-                if isinstance(self.domain_entry, ctk.CTkTextbox):
-                    self.domain_entry.delete("1.0", "end")
-                    self.domain_entry.insert("1.0", str(settings.get("domain", "")))
-
-            if hasattr(self, "temp_mail_entry"):
-                self.temp_mail_entry.delete(0, "end")
-                self.temp_mail_entry.insert(0, str(settings.get("temp_mail", "null")))
-
-            # IMAP 设置
-            if hasattr(self, "imap_server_entry"):
-                self.imap_server_entry.delete(0, "end")
-                self.imap_server_entry.insert(0, str(settings.get("imap_server", "")))
-
-            if hasattr(self, "imap_port_entry"):
-                self.imap_port_entry.delete(0, "end")
-                self.imap_port_entry.insert(0, str(settings.get("imap_port", "993")))
-
-            if hasattr(self, "imap_user_entry"):
-                self.imap_user_entry.delete(0, "end")
-                self.imap_user_entry.insert(0, str(settings.get("imap_user", "")))
-
-            if hasattr(self, "imap_pass_entry"):
-                self.imap_pass_entry.delete(0, "end")
-                self.imap_pass_entry.insert(0, str(settings.get("imap_pass", "")))
-
-            # IMAP 协议
-            if hasattr(self, "imap_protocol_option"):
-                protocol = str(settings.get("imap_protocol", "IMAP"))
-                if protocol in ["IMAP", "POP3"]:
-                    self.imap_protocol_option.set(protocol)
-
-            # 浏览器设置
-            if hasattr(self, "user_agent_entry"):
-                self.user_agent_entry.delete(0, "end")
-                self.user_agent_entry.insert(0, str(settings.get("browser_user_agent", "")))
-
-            if hasattr(self, "browser_path_entry"):
-                self.browser_path_entry.delete(0, "end")
-                self.browser_path_entry.insert(0, str(settings.get("browser_path", "")))
-
-            # 无头模式
-            if hasattr(self, "headless_switch"):
-                if settings.get("browser_headless", 1):  # 1 表示开启
-                    self.headless_switch.select()
-                else:
-                    self.headless_switch.deselect()
-
-            # 代理设置
-            if hasattr(self, "proxy_entry"):
-                self.proxy_entry.delete(0, "end")
-                self.proxy_entry.insert(0, str(settings.get("proxy", "")))
-
-            # 重试次数
-            if hasattr(self, "retry_entry"):
-                self.retry_entry.delete(0, "end")
-                self.retry_entry.insert(0, str(settings.get("retry_count", 3)))
-
-            # 日志级别
-            if hasattr(self, "log_level_option"):
-                log_level = str(settings.get("log_level", "INFO"))
-                if log_level in ["DEBUG", "INFO", "WARNING", "ERROR"]:
-                    self.log_level_option.set(log_level)
-                    logging.getLogger().setLevel(log_level)
-
-            # 外观模式
-            if hasattr(self, "appearance_mode_option"):
-                appearance = str(settings.get("appearance_mode", "System"))
-                if appearance in ["Light", "Dark", "System"]:
-                    self.appearance_mode_option.set(appearance)
-                    self.change_appearance_mode(appearance)
-
-            logging.info("设置加载完成")
-
         except Exception as e:
             logging.error(f"加载设置失败: {str(e)}")
+            logging.exception("详细错误信息:")
             # 不显示错误消息框，只记录日志
             # self.show_error_message(f"加载设置失败: {str(e)}")
-
-# 在自动化流程中使用
-account_manager = AccountManager()
-
-# 假设这是你的自动化流程中生成账号的部分
-def generate_account():
-    # 这里是你的账号生成逻辑
-    account = "example@email.com"
-    password = "generated_password"
-
-    # 保存账号信息
-    account_manager.save_account(account, password)
-
-    # 检查账号是否有效
-    if account_manager.is_account_valid():
-        remaining_days = account_manager.get_remaining_days()
-        print(f"账号有效，剩余 {remaining_days} 天")
-    else:
-        print("账号已过期")
